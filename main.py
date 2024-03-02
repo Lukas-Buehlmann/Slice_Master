@@ -1,15 +1,22 @@
 import numpy as np
 import cv2
 
-
+# a class to isolate a given colour and apply effects to it
 class Colour:
     def __init__(self, h, sens, name, data_hsv):
 
+        # catches hue values that are too low
+        h_diff = h - sens
+        if h_diff < 0:
+            h -= h_diff
+
+        # isolate the colour
         lower = np.array([h - sens, 100, 100], np.uint8)
         upper = np.array([h + sens, 255, 255], np.uint8)
         self.range = cv2.inRange(hsvData, red_lower, red_upper)
 
-    def dilate(self, size, frame_data):
+    # expands the borders of large patches in colour range. kills noise. based on size
+    def dilate_colour(self, size, frame_data):
         kernel = np.ones((size, size), dtype="uint8")
         mask = cv2.dilate(self.range, kernel)
 
