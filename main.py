@@ -16,6 +16,7 @@ class Colour:
         self.range = cv2.inRange(hsvData, red_lower, red_upper)
 
     # expands the borders of large patches in colour range. kills noise. based on size
+    # https://docs.opencv.org/4.x/d9/d61/tutorial_py_morphological_ops.html - docs for morphological transformation
     def dilate_colour(self, size, frame_data):
         kernel = np.ones((size, size), dtype="uint8")
         mask = cv2.dilate(self.range, kernel)
@@ -37,36 +38,19 @@ def main():
         hsv_data = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
         # Set up lower and upper bounds for each desired colour---------------------------------------------------------
-        # np.uint8 sets array data type to 8-bit unsigned integers
-        red_lower = np.array([0, 100, 100], np.uint8)
-        red_upper = np.array([2 * SENSITIVITY, 255, 255], np.uint8)
-        red_range = cv2.inRange(hsvData, red_lower, red_upper)
+        red = Colour(0, 10, "red", hsv_data)
+        red_result = red.dilate_colour(5, frame)
 
-        green_lower = np.array([60 - SENSITIVITY, 100, 100], np.uint8)
-        green_upper = np.array([60 + SENSITIVITY, 255, 255], np.uint8)
-        green_range = cv2.inRange(hsvData, green_lower, green_upper)
+        green = Colour(60, 10, "green", hsv_data)
+        green_result = green.dilate_colour(5, frame)
 
-        blue_lower = np.array([120 - SENSITIVITY, 100, 100], np.uint8)
-        blue_upper = np.array([120 + SENSITIVITY, 255, 255], np.uint8)
-        blue_range = cv2.inRange(hsvData, blue_lower, blue_upper)
+        blue = Colour(120, 10, "blue", hsv_data)
+        blue_result = blue.dilate_colour(5, frame)
 
-        # Use a matrix to isolate desired colours-----------------------------------------------------------------------
-        # https://docs.opencv.org/4.x/d9/d61/tutorial_py_morphological_ops.html - docs for morphological transformation
-
-        kernel = np.ones((5, 5), dtype="uint8")  # creates a 5x5 matrix. Size determines dilation strength
-
-        # Expands the borders of the mask: image dilation
-        red_mask = cv2.dilate(red_range, kernel)
-        # isolate colours in the given range
-        red_result = cv2.bitwise_and(frame, frame, mask=red_mask)
-
-        # green
-        green_mask = cv2.dilate(green_range, kernel)
-        green_result = cv2.bitwise_and(frame, frame, mask=green_mask)
-
-        # blue
-        blue_mask = cv2.dilate(blue_range, kernel)
-        blue_result = cv2.bitwise_and(frame, frame, mask=blue_mask)
+        # Creating contour to track green color
+        contours, hierarchy = cv2.findContours(green_mask,
+                                               cv2.RETR_TREE,
+                                               cv2.CHAIN_APPROX_SIMPLE)
 
         for pic, contour in enumerate(contours):
             area = cv2.contourArea(contour)
@@ -80,7 +64,7 @@ def main():
                             cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                             (0, 0, 255))
 
-            # Creating contour to track green color
+        # Creating contour to track green color
         contours, hierarchy = cv2.findContours(green_mask,
                                                cv2.RETR_TREE,
                                                cv2.CHAIN_APPROX_SIMPLE)
@@ -97,7 +81,7 @@ def main():
                             cv2.FONT_HERSHEY_SIMPLEX,
                             1.0, (0, 255, 0))
 
-            # Creating contour to track blue color
+        # Creating contour to track blue color
         contours, hierarchy = cv2.findContours(blue_mask,
                                                cv2.RETR_TREE,
                                                cv2.CHAIN_APPROX_SIMPLE)
@@ -113,7 +97,7 @@ def main():
                             cv2.FONT_HERSHEY_SIMPLEX,
                             1.0, (255, 0, 0))
 
-            # Program Termination
+        # Program Termination
         cv2.imshow("Multiple Color Detection in Real-Time", imageFrame)
         if cv2.waitKey(10) & 0xFF == ord('q'):
             camera.release()
