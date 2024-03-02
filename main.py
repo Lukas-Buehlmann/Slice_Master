@@ -9,6 +9,12 @@ class Colour:
         upper = np.array([h + sens, 255, 255], np.uint8)
         self.range = cv2.inRange(hsvData, red_lower, red_upper)
 
+    def dilate(self, size, frame_data):
+        kernel = np.ones((size, size), dtype="uint8")
+        mask = cv2.dilate(self.range, kernel)
+
+        return cv2.bitwise_and(frame_data, frame_data, mask=mask)
+
 
 def main():
 
