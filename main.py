@@ -7,6 +7,7 @@ import random
 
 KERNEL_SIZE = 5
 
+
 # a class to isolate a given colour and apply effects to it
 class Colour:
     def __init__(self, h, sens, name, data_hsv):
@@ -44,7 +45,7 @@ class Colour:
                     frame_data,
                     (x, y),
                     (x + w, y + h),
-                    hsv_to_bgr(self.h, 255, 255),
+                    self.hsv_to_bgr((self.h, 255, 255)),
                     2
                 )
 
@@ -53,7 +54,7 @@ class Colour:
                     f"{self.name} Colour",
                     (x, y),
                     cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                    hsv_to_bgr(self.h, 255, 255)
+                    self.hsv_to_bgr((self.h, 255, 255))
                 )
 
         return frame_data
@@ -63,25 +64,33 @@ class Colour:
         try:
             h, s, v = hsv
 
-            c = v * s
-            new_h = h / 30
-            x = c * (1 - math.abs(new_h % 2 - 1))
+            # formula uses s and v as values from 0-1 so dividing by 255^2 maps them properly
+            c = (v * s) / (255**2)  # 1 when v and s are 255
+            new_h = h / 30  # maps between 0 and 6
+            x = c * (1 - math.fabs(new_h % 2 - 1))
 
             if 0 <= new_h < 1:
-                return (0, x, c)
+                temp = (0, x, c)
             elif 1 <= new_h < 2:
-                return (0, c, x)
+                temp = (0, c, x)
             elif 2 <= new_h < 3:
-                return (x, c, 0)
+                temp = (x, c, 0)
             elif 3 <= new_h < 4:
-                return (0, c, x)
+                temp = (0, c, x)
             elif 4 <= new_h < 5:
-                return (c, 0, x)
+                temp = (c, 0, x)
             elif 5 <= new_h < 6:
-                return (x, 0, c)
+                temp = (x, 0, c)
             else:
                 print("h was out of range. returning (0, 0, 0)")
                 return (0, 0, 0)
+
+            m = v - c*255
+            print((temp[0]*255 + m, temp[1]*255 + m, temp[2]*255 + m))
+            return (temp[0]*255 + m, temp[1]*255 + m, temp[2]*255 + m)
+
+        except UnboundLocalError:
+            print("hsv should be a tuple with 3 values. Returning (0, 0, 0)")
         except:
             print("hsv conversion failed. Returning (0, 0, 0)")
             print(f"data entered: h={h} s={s} v={v}")
