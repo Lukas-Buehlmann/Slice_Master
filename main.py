@@ -13,7 +13,7 @@ HEIGHT = 512
 
 # a class to isolate a given colour and apply effects to it
 class Colour:
-    def __init__(self, h, sens, name, data_hsv):
+    def __init__(self, h, sens, name, data_hsv, minimum=100, maximum=255):
         self.mask = None
         self.name = name
         self.origin_h = h
@@ -25,8 +25,8 @@ class Colour:
             self.h -= h_diff
 
         # isolate the colour
-        lower = np.array([self.h - sens, 100, 100], np.uint8)
-        upper = np.array([self.h + sens, 255, 255], np.uint8)
+        lower = np.array([self.h - sens, minimum, minimum], np.uint8)
+        upper = np.array([self.h + sens, maximum, maximum], np.uint8)
         self.range = cv2.inRange(data_hsv, lower, upper)
 
     # expands the borders of large patches in colour range. kills noise. based on size
@@ -199,11 +199,14 @@ def main():
         hsv_data = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
         # Set up lower and upper bounds for each desired colour
-        red = Colour(0, 10, "red", hsv_data)
+        red = Colour(0, 10, "red", hsv_data, minimum=130)
         red_result = red.dilate_colour(KERNEL_SIZE, frame)
 
-        green = Colour(60, 20, "green", hsv_data)
+        green = Colour(60, 10, "green", hsv_data)
         green_result = green.dilate_colour(KERNEL_SIZE, frame)
+
+        yellow = Colour(30, 5, "yellow", hsv_data)
+        yellow_result = yellow.dilate_colour(KERNEL_SIZE, frame)
 
         blue = Colour(120, 20, "blue", hsv_data)
         blue_result = blue.dilate_colour(KERNEL_SIZE, frame)
@@ -213,8 +216,10 @@ def main():
         # rects.append(temp_rects)
         frame, temp_rects = green.get_contour(frame)
         rects.append(temp_rects)
-        frame, temp = blue.get_contour(frame)
+        frame, temp_rects = yellow.get_contour(frame)
         rects.append(temp_rects)
+        # frame, temp_rects = blue.get_contour(frame)
+        # rects.append(temp_rects)
 
         cv2.imshow("Colour Detection Viewer", frame)
         # End of CV2 Process--------------------------------------------------------------------------------------------
@@ -246,6 +251,10 @@ def main():
         for ball in balls:
             ball.update()
             ball.draw(screen)
+
+        for i in range(len(balls) - 1, -1, -1):
+            if balls[i].rad <= 0:
+                balls.pop(i)
 
         pygame.display.flip()
 
