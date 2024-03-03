@@ -46,7 +46,7 @@ class Colour:
 
         for pic, contour in enumerate(contours):
             area = cv2.contourArea(contour)
-            if area > 300:
+            if area > 800:
                 x, y, w, h = cv2.boundingRect(contour)
                 rect_list.append(pygame.Rect(x, y, w, h))
 
@@ -127,6 +127,50 @@ class Ball:
         pygame.draw.circle(surface, self.colour, (self.x, self.y), self.rad)
 
 
+# combines colliding rects in the list
+def merge_rects(rect_list):
+    copy_list = rect_list.copy()
+    collisions = []
+    kill_list = []
+
+    # print("total rects: ", len(copy_list))
+
+    # find groups of colliding rects
+    for i in range(len(copy_list)):
+        temp_collide = copy_list[i].collidelistall(copy_list)
+        temp_collide.sort()
+        if len(temp_collide) > 1:
+            if temp_collide not in collisions:
+                collisions.append(temp_collide)
+
+    # create a new rect from the group
+    for group in collisions:
+        x = min((copy_list[i].x for i in group))
+        y = min((copy_list[i].y for i in group))
+        merged_rect = pygame.Rect(
+            x,
+            y,
+            max((copy_list[i].x for i in group)) - x,
+            max((copy_list[i].y for i in group)) - y
+        )
+        copy_list.append(merged_rect)
+
+        # collect all indices to delete later
+        for i in group:
+            kill_list.append(i)
+
+    kill_list = list(dict.fromkeys(kill_list))
+    kill_list.sort()
+    # print("dead rects: ", len(kill_list))
+    # delete merged rectangles from list from right to left to avoid issues with shifting indices
+    for i in range(len(kill_list) - 1, -1, -1):
+        copy_list.pop(kill_list[i])
+
+    # print("final length: ", len(copy_list))
+
+    return copy_list
+
+
 def main():
 
     pygame.init()
@@ -193,9 +237,11 @@ def main():
 
         screen.fill((0, 0, 0))
 
-        for colour in rects:
-            for i in range(1, len(colour)):
-                balls.append(Ball(colour[i].center, 8, Colour.bgr_to_rgb(colour[0])))
+        for colour_group in rects:
+            colour = colour_group[0]
+            merged_rects = merge_rects(colour_group[1:])
+            for i in range(len(merged_rects)):
+                balls.append(Ball(merged_rects[i].center, 8, Colour.bgr_to_rgb(colour)))
 
         for ball in balls:
             ball.update()
