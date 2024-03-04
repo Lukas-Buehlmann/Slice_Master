@@ -13,7 +13,7 @@ HEIGHT = 512
 
 # a class to isolate a given colour and apply effects to it
 class Colour:
-    def __init__(self, h, sens, name, data_hsv, minimum=100, maximum=255):
+    def __init__(self, h, sens, name, data_hsv, minimum_s=100, minimum_v=100, maximum_s=255, maximum_v=255):
         self.mask = None
         self.name = name
         self.origin_h = h
@@ -25,8 +25,8 @@ class Colour:
             self.h -= h_diff
 
         # isolate the colour
-        lower = np.array([self.h - sens, minimum, minimum], np.uint8)
-        upper = np.array([self.h + sens, maximum, maximum], np.uint8)
+        lower = np.array([self.h - sens, minimum_s, minimum_v], np.uint8)
+        upper = np.array([self.h + sens, maximum_s, maximum_v], np.uint8)
         self.range = cv2.inRange(data_hsv, lower, upper)
 
     # expands the borders of large patches in colour range. kills noise. based on size
@@ -201,13 +201,13 @@ def main():
         hsv_data = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
         # Set up lower and upper bounds for each desired colour
-        red = Colour(0, 10, "red", hsv_data, minimum=130)
+        red = Colour(0, 10, "red", hsv_data, minimum_s=160, maximum_v=220)
         red_result = red.dilate_colour(KERNEL_SIZE, frame)
 
-        green = Colour(60, 10, "green", hsv_data)
+        green = Colour(60, 10, "green", hsv_data, minimum_v=30)
         green_result = green.dilate_colour(KERNEL_SIZE, frame)
 
-        yellow = Colour(30, 5, "yellow", hsv_data)
+        yellow = Colour(30, 5, "yellow", hsv_data, minimum_v=130)
         yellow_result = yellow.dilate_colour(KERNEL_SIZE, frame)
 
         blue = Colour(120, 20, "blue", hsv_data)
@@ -250,15 +250,19 @@ def main():
             for rect in merged_rects:
                 balls[i].append(Ball(rect.center, 8, Colour.bgr_to_rgb(colour)))
 
-        avg = ball1.pos
+        connections = []
         for ball_type in balls:
+            avg = list(ball1.pos)
             for ball in ball_type:
-                avg[0] += ball.x
-                avg[1] += ball.y
+                avg[0] += (ball.x - avg[0]) * ball.rad / 16
+                avg[1] += (ball.y - avg[1]) * ball.rad / 16
                 ball.update()
                 ball.draw(screen)
-            ball1 = Ball(avg, 8, (255, 0, 0))
+            ball1 = Ball(avg, 8, (0, 0, 255))
+            connections.append(avg)
             ball1.draw(screen)
+
+        pygame.draw.line(screen, (255, 255, 255), tuple(connections[0]), tuple(connections[1]), 8)
 
         for ball_type in balls:
             for i in range(len(ball_type) - 1, -1, -1):
