@@ -7,7 +7,7 @@ import random
 
 KERNEL_SIZE = 20
 
-WIDTH = 512
+WIDTH = 720
 HEIGHT = 512
 
 
@@ -116,6 +116,7 @@ class Colour:
 
 class Ball:
     def __init__(self, pos, r, colour):
+        self.pos = pos
         self.x, self.y = pos
         self.rad = r
         self.colour = colour
@@ -179,7 +180,8 @@ def main():
 
     clock = pygame.time.Clock()
 
-    balls = []
+    balls = [[], []]
+    ball1 = Ball((WIDTH // 2, HEIGHT // 2), 8, (255, 0, 0))
 
     # creates an object that holds default device camera values
     camera = cv2.VideoCapture(0)
@@ -242,19 +244,26 @@ def main():
 
         screen.fill((0, 0, 0))
 
-        for colour_group in rects:
-            colour = colour_group[0]
-            merged_rects = merge_rects(colour_group[1:])
-            for i in range(len(merged_rects)):
-                balls.append(Ball(merged_rects[i].center, 8, Colour.bgr_to_rgb(colour)))
+        for i in range(len(rects)):
+            colour = rects[i][0]
+            merged_rects = merge_rects(rects[i][1:])
+            for rect in merged_rects:
+                balls[i].append(Ball(rect.center, 8, Colour.bgr_to_rgb(colour)))
 
-        for ball in balls:
-            ball.update()
-            ball.draw(screen)
+        avg = ball1.pos
+        for ball_type in balls:
+            for ball in ball_type:
+                avg[0] += ball.x
+                avg[1] += ball.y
+                ball.update()
+                ball.draw(screen)
+            ball1 = Ball(avg, 8, (255, 0, 0))
+            ball1.draw(screen)
 
-        for i in range(len(balls) - 1, -1, -1):
-            if balls[i].rad <= 0:
-                balls.pop(i)
+        for ball_type in balls:
+            for i in range(len(ball_type) - 1, -1, -1):
+                if ball_type[i].rad <= 0:
+                    ball_type.pop(i)
 
         pygame.display.flip()
 
