@@ -114,6 +114,75 @@ class Colour:
         return bgr[2], bgr[1], bgr[0]
 
 
+class Target:
+    def __init__(self, pos, rad, colour):
+        self.l_pos = list(pos)
+        self.r_pos = list(pos)
+        self.rad = rad
+        self.colour = colour
+        self.gravity = 0.05
+        self.cut = False
+        self.l_v = 0
+        self.r_v = 0
+        self.y_v = 0
+        self.angle = 0
+
+    # increments the position by given changes in x and y. -1 for side is left, 0 is both, 1 is right
+    def incr_pos(self, side, d_x, d_y):
+        if side == -1:
+            self.l_pos[0] += d_x
+            self.l_pos[1] += d_y
+        elif side == 0:
+            self.l_pos[0] += d_x
+            self.l_pos[1] += d_y
+            self.r_pos[0] += d_x
+            self.r_pos[1] += d_y
+        elif side == 1:
+            self.r_pos[0] += d_x
+            self.r_pos[1] += d_y
+
+    def activate_cut(self, angle):
+        self.angle = angle
+        self.cut = True
+        self.l_v = -random.random() * 5
+        self.r_v = random.random() * 5
+
+    def update(self):
+        if self.cut:
+            self.y_v += self.gravity
+            self.incr_pos(-1, self.l_v, self.y_v)
+            self.incr_pos(1, self.r_v, self.y_v)
+
+    def draw(self, surface):
+        if self.cut:
+            bounds = pygame.Rect(self.l_pos[0] - self.rad, self.l_pos[1] - self.rad, self.rad, self.rad)
+            pygame.draw.arc(surface, self.colour, bounds, self.angle, self.angle + math.pi, self.rad)
+            bounds = pygame.Rect(self.r_pos[0] - self.rad, self.r_pos[1] - self.rad, self.rad, self.rad)
+            pygame.draw.arc(surface, self.colour, bounds, self.angle + math.pi, self.angle, self.rad)
+        else:
+            pygame.draw.circle(surface, self.colour, self.l_pos, self.rad)
+
+
+class Particle:
+    def __init__(self, pos, strength, size, colour):
+        self.pos = pygame.math.Vector2(pos)
+        self.size = size
+        self.colour = colour
+        self.GRAV = 0.05
+        angle = random.random() * math.pi * 2
+        x = strength * math.cos(angle)
+        y = strength * -math.sin(angle)
+        self.v = pygame.math.Vector2(x, y)
+
+    def update(self):
+        self.v.y += self.GRAV
+        self.pos += self.v
+
+    def draw(self, surface):
+        rect = pygame.Rect(self.pos.x, self.pos.y, self.size, self.size)
+        pygame.draw.rect(surface, self.colour, rect)
+
+
 class Ball:
     def __init__(self, pos, r, colour):
         self.pos = pos
@@ -181,7 +250,15 @@ def main():
     clock = pygame.time.Clock()
 
     balls = [[], []]
-    ball1 = Ball((WIDTH // 2, HEIGHT // 2), 8, (255, 0, 0))
+    avg_ball = []
+    old_pos = []
+    for i in balls:
+        avg_ball.append(Ball((WIDTH // 2, HEIGHT // 2), 8, (255, 0, 0)))
+        old_pos.append((WIDTH // 2, HEIGHT // 2))
+    # ball1 = Ball((WIDTH // 2, HEIGHT // 2), 8, (255, 0, 0))
+
+    target_1 = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
+    particles = []
 
     # creates an object that holds default device camera values
     camera = cv2.VideoCapture(0)
@@ -250,17 +327,38 @@ def main():
             for rect in merged_rects:
                 balls[i].append(Ball(rect.center, 8, Colour.bgr_to_rgb(colour)))
 
+        target_1.update()
+        target_1.draw(screen)
+
+        for piece in particles:
+            piece.update()
+            piece.draw(screen)
+
         connections = []
-        for ball_type in balls:
-            avg = list(ball1.pos)
-            for ball in ball_type:
+        for i in range(len(balls)):
+            avg = list(avg_ball[i].pos)
+            for ball in balls[i]:
                 avg[0] += (ball.x - avg[0]) * ball.rad / 16
                 avg[1] += (ball.y - avg[1]) * ball.rad / 16
                 ball.update()
                 ball.draw(screen)
-            ball1 = Ball(avg, 8, (0, 0, 255))
+            avg_ball[i] = Ball(avg, 8, (0, 0, 255))
             connections.append(avg)
-            ball1.draw(screen)
+            avg_ball[i].draw(screen)
+
+        for i in range(len(avg_ball)):
+            ball_v = (avg_ball[i].pos[0] - old_pos[i][0]), (avg_ball[i].pos[1] - old_pos[i][1])
+
+            if not target_1.cut:
+                if math.sqrt((avg_ball[i].pos[0] - target_1.l_pos[0])**2 + (avg_ball[i][1] - target_1.l_pos[1])**2) < avg_ball[i].rad + target_1.rad:
+                    if ball_v[0] == 0:
+                        angle = math.pi / 2
+                    else:
+                        angle = math.atan(-ball_v[1] / ball_v[0])
+                    target_1.activate_cut(angle)
+                    for j in range(6000):
+                        particles.append(Particle(target_1.l_pos, random.random() * 5, 3, (255, 0, 0)))
+                    # target_1 = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
 
         pygame.draw.line(screen, (255, 255, 255), tuple(connections[0]), tuple(connections[1]), 8)
 
@@ -268,6 +366,10 @@ def main():
             for i in range(len(ball_type) - 1, -1, -1):
                 if ball_type[i].rad <= 0:
                     ball_type.pop(i)
+
+        for i in range(len(particles) - 1, -1, -1):
+            if particles[i].pos.y > HEIGHT:
+                particles.pop(i)
 
         pygame.display.flip()
 
