@@ -5,10 +5,10 @@ import sys
 import math
 import random
 
-KERNEL_SIZE = 20
+KERNEL_SIZE = 15
 
-WIDTH = 720
-HEIGHT = 512
+WIDTH = 600
+HEIGHT = 500
 
 
 # a class to isolate a given colour and apply effects to it
@@ -120,7 +120,7 @@ class Target:
         self.r_pos = list(pos)
         self.rad = rad
         self.colour = colour
-        self.gravity = 0.05
+        self.gravity = 0.5
         self.cut = False
         self.l_v = 0
         self.r_v = 0
@@ -148,19 +148,19 @@ class Target:
         self.r_v = random.random() * 5
 
     def update(self):
-        if self.cut:
-            self.y_v += self.gravity
-            self.incr_pos(-1, self.l_v, self.y_v)
-            self.incr_pos(1, self.r_v, self.y_v)
+        self.y_v += self.gravity
+        self.incr_pos(-1, self.l_v, self.y_v)
+        self.incr_pos(1, self.r_v, self.y_v)
 
-    def draw(self, surface):
+    def draw(self, surface, src):
         if self.cut:
             bounds = pygame.Rect(self.l_pos[0] - self.rad, self.l_pos[1] - self.rad, self.rad, self.rad)
             pygame.draw.arc(surface, self.colour, bounds, self.angle, self.angle + math.pi, self.rad)
             bounds = pygame.Rect(self.r_pos[0] - self.rad, self.r_pos[1] - self.rad, self.rad, self.rad)
             pygame.draw.arc(surface, self.colour, bounds, self.angle + math.pi, self.angle, self.rad)
         else:
-            pygame.draw.circle(surface, self.colour, self.l_pos, self.rad)
+            surface.blit(src, (self.l_pos[0] - self.rad, self.l_pos[1] - self.rad))
+            # pygame.draw.circle(surface, self.colour, self.l_pos, self.rad)
 
 
 class Particle:
@@ -168,7 +168,7 @@ class Particle:
         self.pos = pygame.math.Vector2(pos)
         self.size = size
         self.colour = colour
-        self.GRAV = 0.05
+        self.GRAV = 0.5
         angle = random.random() * math.pi * 2
         x = strength * math.cos(angle)
         y = strength * -math.sin(angle)
@@ -244,6 +244,10 @@ def merge_rects(rect_list):
 def main():
 
     pygame.init()
+    pygame.font.init()
+
+    font = pygame.font.Font(None, 48)
+    score = 0
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -257,11 +261,18 @@ def main():
         old_pos.append((WIDTH // 2, HEIGHT // 2))
     # ball1 = Ball((WIDTH // 2, HEIGHT // 2), 8, (255, 0, 0))
 
-    target_1 = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
+    targets = []
+    for i in range(10):
+        target_1 = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
+        targets.append(target_1)
     particles = []
 
     # creates an object that holds default device camera values
     camera = cv2.VideoCapture(0)
+
+    bg_img = pygame.image.load(f"Images//BG_{random.randint(1, 4)}.jpg")
+    fruit_img = pygame.image.load("Images//Pomegranate.webp")
+    fruit_img = pygame.transform.scale(fruit_img, (30, 30))
 
     framerate = camera.get(cv2.CAP_PROP_FPS)
 
@@ -281,10 +292,11 @@ def main():
         red = Colour(0, 10, "red", hsv_data, minimum_s=160, maximum_v=220)
         red_result = red.dilate_colour(KERNEL_SIZE, frame)
 
-        green = Colour(60, 10, "green", hsv_data, minimum_v=30)
+        # minimum_v=100, minimum_s=120
+        green = Colour(175, 0, "pink", hsv_data, minimum_v=100, minimum_s=120)  # min_v=30
         green_result = green.dilate_colour(KERNEL_SIZE, frame)
 
-        yellow = Colour(30, 5, "yellow", hsv_data, minimum_v=130)
+        yellow = Colour(30, 10, "yellow", hsv_data, minimum_v=70)  # min_v=130
         yellow_result = yellow.dilate_colour(KERNEL_SIZE, frame)
 
         blue = Colour(120, 20, "blue", hsv_data)
@@ -318,8 +330,12 @@ def main():
                     pygame.quit()
                     cv2.destroyAllWindows()
                     sys.exit()
+                if event.key == pygame.K_SPACE:
+                    bg_img = pygame.image.load(f"Images//BG_{random.randint(1, 4)}.jpg")
+                    bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
 
-        screen.fill((0, 0, 0))
+        # screen.fill((0, 0, 0))
+        screen.blit(bg_img, (0, 0))
 
         for i in range(len(rects)):
             colour = rects[i][0]
@@ -327,8 +343,9 @@ def main():
             for rect in merged_rects:
                 balls[i].append(Ball(rect.center, 8, Colour.bgr_to_rgb(colour)))
 
-        target_1.update()
-        target_1.draw(screen)
+        for target in targets:
+            target.update()
+            target.draw(screen, fruit_img)
 
         for piece in particles:
             piece.update()
@@ -341,7 +358,7 @@ def main():
                 avg[0] += (ball.x - avg[0]) * ball.rad / 16
                 avg[1] += (ball.y - avg[1]) * ball.rad / 16
                 ball.update()
-                ball.draw(screen)
+                # ball.draw(screen)
             avg_ball[i] = Ball(avg, 8, (0, 0, 255))
             connections.append(avg)
             avg_ball[i].draw(screen)
@@ -349,16 +366,18 @@ def main():
         for i in range(len(avg_ball)):
             ball_v = (avg_ball[i].pos[0] - old_pos[i][0]), (avg_ball[i].pos[1] - old_pos[i][1])
 
-            if not target_1.cut:
-                if math.sqrt((avg_ball[i].pos[0] - target_1.l_pos[0])**2 + (avg_ball[i][1] - target_1.l_pos[1])**2) < avg_ball[i].rad + target_1.rad:
-                    if ball_v[0] == 0:
-                        angle = math.pi / 2
-                    else:
-                        angle = math.atan(-ball_v[1] / ball_v[0])
-                    target_1.activate_cut(angle)
-                    for j in range(6000):
-                        particles.append(Particle(target_1.l_pos, random.random() * 5, 3, (255, 0, 0)))
-                    # target_1 = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
+            for target in targets:
+                if not target.cut:
+                    if math.sqrt((avg_ball[i].pos[0] - target.l_pos[0])**2 + (avg_ball[i].pos[1] - target.l_pos[1])**2) < avg_ball[i].rad + target_1.rad:
+                        if ball_v[0] == 0:
+                            angle = math.pi / 2
+                        else:
+                            angle = math.atan(-ball_v[1] / ball_v[0])
+                        target.activate_cut(angle)
+                        score += 1
+                        for j in range(300):
+                            particles.append(Particle(target.l_pos, random.random() * 5, 3, (255, 0, 0)))
+                        # target = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
 
         pygame.draw.line(screen, (255, 255, 255), tuple(connections[0]), tuple(connections[1]), 8)
 
@@ -370,6 +389,18 @@ def main():
         for i in range(len(particles) - 1, -1, -1):
             if particles[i].pos.y > HEIGHT:
                 particles.pop(i)
+
+        for i in range(len(targets)):
+            if targets[i].l_pos[1] > HEIGHT and targets[i].r_pos[1] > HEIGHT:
+                target = Target((random.randint(30, WIDTH-30), HEIGHT), 20, (255, 0, 0))
+                target.y_v = -20
+                rand_num = random.random()*4
+                target.l_v = rand_num
+                target.r_v = rand_num
+                targets[i] = target
+
+        text = font.render(str(score), True, (255, 255, 255))
+        screen.blit(text, (WIDTH//2-10, HEIGHT//20))
 
         pygame.display.flip()
 
