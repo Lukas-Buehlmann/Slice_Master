@@ -4,6 +4,7 @@ import pygame
 import sys
 import math
 import random
+from menu import Button, Slider
 
 KERNEL_SIZE = 15
 
@@ -253,7 +254,7 @@ def main():
 
     clock = pygame.time.Clock()
 
-    balls = [[], []]
+    balls = [[]]
     avg_ball = []
     old_pos = []
     for i in balls:
@@ -266,6 +267,12 @@ def main():
         target_1 = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
         targets.append(target_1)
     particles = []
+
+    # Run loading screen before attempting to load camera
+    screen.fill((0, 0, 0))
+    load_text = Button(WIDTH // 4, HEIGHT // 2 - 18, WIDTH // 2, 50, "Loading...", font_size=36)
+    load_text.draw(screen, (0, 0, 0), (255, 255, 255))
+    pygame.display.flip()
 
     # creates an object that holds default device camera values
     camera = cv2.VideoCapture(0)
@@ -305,8 +312,8 @@ def main():
         # finds the location of all patches of the given colours. Stores in a list of rectangles
         # frame, temp_rects = red.get_contour(frame)
         # rects.append(temp_rects)
-        frame, temp_rects = green.get_contour(frame)
-        rects.append(temp_rects)
+        # frame, temp_rects = green.get_contour(frame)
+        # rects.append(temp_rects)
         frame, temp_rects = yellow.get_contour(frame)
         rects.append(temp_rects)
         # frame, temp_rects = blue.get_contour(frame)
@@ -379,7 +386,7 @@ def main():
                             particles.append(Particle(target.l_pos, random.random() * 5, 3, (255, 0, 0)))
                         # target = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
 
-        pygame.draw.line(screen, (255, 255, 255), tuple(connections[0]), tuple(connections[1]), 8)
+        # pygame.draw.line(screen, (255, 255, 255), tuple(connections[0]), tuple(connections[1]), 8)
 
         for ball_type in balls:
             for i in range(len(ball_type) - 1, -1, -1):
