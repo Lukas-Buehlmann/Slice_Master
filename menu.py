@@ -33,10 +33,11 @@ class Button:
     def update(self, mouse_down):
 
         mousepos = pygame.mouse.get_pos()
+
         self.pressed = (
-                mouse_down and
-                self.hitbox.x <= mousepos[0] <= self.hitbox.x + self.hitbox.w and
-                self.hitbox.y <= mousepos[0] <= self.hitbox.y + self.hitbox.h
+            mouse_down and
+            self.hitbox.left <= mousepos[0] <= self.hitbox.right and
+            self.hitbox.top <= mousepos[1] <= self.hitbox.bottom
         )
 
     def draw(self, surface, border_colour, font_colour, rounded_rad=-1, border_w=1, centred=True):

@@ -5,11 +5,23 @@ import sys
 import math
 import random
 from menu import Button, Slider
+import time
 
 KERNEL_SIZE = 15
 
 WIDTH = 600
 HEIGHT = 500
+
+# music from https://www.fesliyanstudios.com/royalty-free-music/downloads-c/japanese-music/63
+# credit to Fesliyan Studios
+MUSIC_LIST = [
+    "Music//A_Geishas_Lament.mp3",
+    "Music//Fun_in_Kyoto.mp3",
+    "Music//Ninja_Ambush.mp3",
+    "Music//Peaceful_Koi_Pond.mp3",
+    "Music//Tokyo_Lo-Fi.mp3",
+    "Music//Zen_Garden.mp3"
+]
 
 
 # a class to isolate a given colour and apply effects to it
@@ -242,15 +254,130 @@ def merge_rects(rect_list):
     return copy_list
 
 
+def title_screen(surface):
+    samurai_font = pygame.font.Font("Midorima.ttf", 256)
+
+    win_width = surface.get_width()
+    win_height = surface.get_height()
+
+    mouse_down = False
+
+    rand_nums = [i for i in range(6)]
+    music_path = MUSIC_LIST[rand_nums.pop(random.randint(0, len(rand_nums) - 1))]
+    current_track = pygame.mixer.Sound(music_path)
+    track_length = current_track.get_length()
+    start_time = time.time()
+    current_track.play()
+
+    # image Designed by Freepik
+    bg_img = pygame.image.load("Images//Title_bg.jpg")
+    bg_img = pygame.transform.scale(bg_img, (win_width, win_height))
+
+    clock = pygame.time.Clock()
+
+    play_button = Button(
+        win_width // 2 - 200,
+        win_height // 2,
+        400,
+        100,
+        "Play Game",
+        font_path="Midorima.ttf",
+        font_size=72
+    )
+    settings_button = Button(
+        win_width // 2 - 200,
+        win_height // 2 + 120,
+        400,
+        100,
+        "Settings",
+        font_path="Midorima.ttf",
+        font_size=72
+    )
+    quit_button = Button(
+        win_width // 2 - 200,
+        win_height // 2 + 240,
+        400,
+        100,
+        "Quit",
+        font_path="Midorima.ttf",
+        font_size=72
+    )
+
+    my_slider = Slider("Volume", 50, 100, 100, 600, 40, font_size=36)
+
+    while True:
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_down = True
+            elif event.type == pygame.MOUSEBUTTONUP:
+                mouse_down = False
+
+        # begin next song when each finishes
+        if time.time() - start_time >= track_length:
+            music_path = MUSIC_LIST[rand_nums.pop(random.randint(0, len(rand_nums) - 1))]
+            current_track = pygame.mixer.Sound(music_path)
+            track_length = current_track.get_length()
+            start_time = time.time()
+            current_track.play()
+
+            # refill song list when all are exhausted
+            if len(rand_nums) == 0:
+                rand_nums = [i for i in range(6)]
+
+        # screen.fill((0, 0, 0))
+        surface.blit(bg_img, (0, 0))
+
+        w, h = samurai_font.size("Slice Master")
+        text_surface = samurai_font.render("Slice Master", True, (0, 0, 0))
+        surface.blit(text_surface, (win_width // 2 - w // 2, 0))
+
+        play_button.update(mouse_down)
+        play_button.draw(surface, (255, 255, 255), (255, 255, 255), 10, 3)
+        settings_button.update(mouse_down)
+        settings_button.draw(surface, (255, 255, 255), (255, 255, 255), 10, 3)
+        quit_button.update(mouse_down)
+        quit_button.draw(surface, (255, 255, 255), (255, 255, 255), 10, 3)
+
+        my_slider.update(mouse_down)
+        my_slider.draw(surface, (255, 255, 255))
+
+        if play_button.pressed:
+            break
+
+        if quit_button.pressed:
+            pygame.quit()
+            sys.exit()
+
+        # sets the volume. Value must be from 0.0-1.0 and self.value is from 0-100
+        current_track.set_volume(my_slider.value / 100)
+
+        pygame.display.flip()
+        clock.tick(165)
+
+
 def main():
 
     pygame.init()
     pygame.font.init()
+    pygame.mixer.init()
 
     font = pygame.font.Font(None, 48)
     score = 0
 
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    res_info = pygame.display.Info()
+    win_width = res_info.current_w
+    win_height = res_info.current_h
+
+    window = pygame.display.set_mode((win_width, win_height))
+    screen = pygame.Surface((WIDTH, HEIGHT))
 
     clock = pygame.time.Clock()
 
@@ -268,16 +395,20 @@ def main():
         targets.append(target_1)
     particles = []
 
+    title_screen(window)
+
     # Run loading screen before attempting to load camera
     screen.fill((0, 0, 0))
     load_text = Button(WIDTH // 4, HEIGHT // 2 - 18, WIDTH // 2, 50, "Loading...", font_size=36)
     load_text.draw(screen, (0, 0, 0), (255, 255, 255))
+    window.blit(screen, (win_width//2 - WIDTH//2, win_height//2 - HEIGHT//2))
     pygame.display.flip()
 
     # creates an object that holds default device camera values
     camera = cv2.VideoCapture(0)
 
     bg_img = pygame.image.load(f"Images//BG_{random.randint(1, 4)}.jpg")
+    bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
     fruit_img = pygame.image.load("Images//Pomegranate.webp")
     fruit_img = pygame.transform.scale(fruit_img, (30, 30))
 
@@ -408,6 +539,10 @@ def main():
 
         text = font.render(str(score), True, (255, 255, 255))
         screen.blit(text, (WIDTH//2-10, HEIGHT//20))
+
+        new_w = WIDTH * (win_height / HEIGHT)
+        screen_surface = pygame.transform.scale(screen, (new_w, win_height))
+        window.blit(screen_surface, (win_width//2 - new_w//2, 0))
 
         pygame.display.flip()
 
