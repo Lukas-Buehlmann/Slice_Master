@@ -84,7 +84,7 @@ class Slider:
         self.num_w, self.num_h = self.font.size("100")  # width of value number at max width (at 100)
         self.offset = w // 20
 
-        self.slider_range = (self.rect.x + self.text_w + self.offset, w - self.offset - self.num_w)
+        self.slider_range = (self.rect.x + self.text_w + self.offset, self.rect.right - self.offset - self.num_w)
 
     def update(self, mouse_down):
         mouse_x, mouse_y = pygame.mouse.get_pos()

@@ -7,7 +7,7 @@ import random
 from menu import Button, Slider
 import time
 
-KERNEL_SIZE = 15
+KERNEL_SIZE = 20
 
 WIDTH = 600
 HEIGHT = 500
@@ -210,6 +210,27 @@ class Ball:
         pygame.draw.circle(surface, self.colour, (self.x, self.y), self.rad)
 
 
+def choose_music(channel):
+    rand_track = random.randint(0, len(MUSIC_LIST) - 1)
+    track = pygame.mixer.Sound(MUSIC_LIST[rand_track])
+    channel.play(track)
+
+
+def get_setting(label):
+    with open("settings.txt", 'r') as f:
+        try:
+            for line in f.readlines():
+                line_text = line.split()
+                line_text[0] = line_text[0].strip(':')
+                if line_text[0] == label:
+                    return line_text[1]
+            else:
+                return None
+        except:
+            print("error reading file")
+            return None
+
+
 # combines colliding rects in the list
 def merge_rects(rect_list):
     copy_list = rect_list.copy()
@@ -254,7 +275,76 @@ def merge_rects(rect_list):
     return copy_list
 
 
-def title_screen(surface):
+def settings_screen(surface, sound_channel):
+
+    win_width = surface.get_width()
+    win_height = surface.get_height()
+
+    mouse_down = False
+
+    # image Designed by Freepik
+    bg_img = pygame.image.load("Images//Title_bg.jpg")
+    bg_img = pygame.transform.scale(bg_img, (win_width, win_height))
+
+    clock = pygame.time.Clock()
+
+    init_volume = int(get_setting("volume"))
+
+    back_button = Button(
+        win_width // 2 - 200,
+        win_height // 2 + 240,
+        400,
+        100,
+        "Back",
+        font_path="Midorima.ttf",
+        font_size=72
+    )
+
+    my_slider = Slider("Volume", init_volume, win_width // 2 - 300, win_height // 2, 600 , 40, font_size=36)
+
+    while True:
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_down = True
+            elif event.type == pygame.MOUSEBUTTONUP:
+                mouse_down = False
+            elif event.type == pygame.USEREVENT:
+                choose_music(sound_channel)
+
+        surface.blit(bg_img, (0, 0))
+
+        back_button.update(mouse_down)
+        back_button.draw(surface, (255, 255, 255), (255, 255, 255), 10, 3)
+
+        my_slider.update(mouse_down)
+        my_slider.draw(surface, (255, 255, 255))
+
+        if back_button.pressed:
+            break
+
+        # sets the volume. Value must be from 0.0-1.0 and self.value is from 0-100
+        sound_channel.set_volume(my_slider.value / 100)
+
+        if my_slider.value != init_volume:
+            with open("settings.txt", 'w') as f:
+                f.write(f"volume: {my_slider.value}")
+
+            init_volume = my_slider.value
+
+        pygame.display.flip()
+
+        clock.tick(165)
+
+
+def title_screen(surface, sound_channel):
     samurai_font = pygame.font.Font("Midorima.ttf", 256)
 
     win_width = surface.get_width()
@@ -262,18 +352,13 @@ def title_screen(surface):
 
     mouse_down = False
 
-    rand_nums = [i for i in range(6)]
-    music_path = MUSIC_LIST[rand_nums.pop(random.randint(0, len(rand_nums) - 1))]
-    current_track = pygame.mixer.Sound(music_path)
-    track_length = current_track.get_length()
-    start_time = time.time()
-    current_track.play()
-
     # image Designed by Freepik
     bg_img = pygame.image.load("Images//Title_bg.jpg")
     bg_img = pygame.transform.scale(bg_img, (win_width, win_height))
 
     clock = pygame.time.Clock()
+
+    init_volume = int(get_setting("volume"))
 
     play_button = Button(
         win_width // 2 - 200,
@@ -303,8 +388,6 @@ def title_screen(surface):
         font_size=72
     )
 
-    my_slider = Slider("Volume", 50, 100, 100, 600, 40, font_size=36)
-
     while True:
         events = pygame.event.get()
         for event in events:
@@ -319,18 +402,8 @@ def title_screen(surface):
                 mouse_down = True
             elif event.type == pygame.MOUSEBUTTONUP:
                 mouse_down = False
-
-        # begin next song when each finishes
-        if time.time() - start_time >= track_length:
-            music_path = MUSIC_LIST[rand_nums.pop(random.randint(0, len(rand_nums) - 1))]
-            current_track = pygame.mixer.Sound(music_path)
-            track_length = current_track.get_length()
-            start_time = time.time()
-            current_track.play()
-
-            # refill song list when all are exhausted
-            if len(rand_nums) == 0:
-                rand_nums = [i for i in range(6)]
+            elif event.type == pygame.USEREVENT:
+                choose_music(sound_channel)
 
         # screen.fill((0, 0, 0))
         surface.blit(bg_img, (0, 0))
@@ -346,18 +419,20 @@ def title_screen(surface):
         quit_button.update(mouse_down)
         quit_button.draw(surface, (255, 255, 255), (255, 255, 255), 10, 3)
 
-        my_slider.update(mouse_down)
-        my_slider.draw(surface, (255, 255, 255))
-
         if play_button.pressed:
+            mouse_down = False
             break
+
+        if settings_button.pressed:
+            mouse_down = False
+            settings_screen(surface, sound_channel)
+            init_volume = int(get_setting("volume"))
 
         if quit_button.pressed:
             pygame.quit()
             sys.exit()
 
-        # sets the volume. Value must be from 0.0-1.0 and self.value is from 0-100
-        current_track.set_volume(my_slider.value / 100)
+        sound_channel.set_volume(init_volume / 100)
 
         pygame.display.flip()
         clock.tick(165)
@@ -389,13 +464,18 @@ def main():
         old_pos.append((WIDTH // 2, HEIGHT // 2))
     # ball1 = Ball((WIDTH // 2, HEIGHT // 2), 8, (255, 0, 0))
 
+    # only can queue one after initial. FIX THIS
+    channel = pygame.mixer.Channel(0)
+    choose_music(channel)
+    channel.set_endevent(pygame.USEREVENT)
+
     targets = []
     for i in range(10):
         target_1 = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
         targets.append(target_1)
     particles = []
 
-    title_screen(window)
+    title_screen(window, channel)
 
     # Run loading screen before attempting to load camera
     screen.fill((0, 0, 0))
@@ -443,10 +523,10 @@ def main():
         # finds the location of all patches of the given colours. Stores in a list of rectangles
         # frame, temp_rects = red.get_contour(frame)
         # rects.append(temp_rects)
-        # frame, temp_rects = green.get_contour(frame)
-        # rects.append(temp_rects)
-        frame, temp_rects = yellow.get_contour(frame)
+        frame, temp_rects = green.get_contour(frame)
         rects.append(temp_rects)
+        # frame, temp_rects = yellow.get_contour(frame)
+        # rects.append(temp_rects)
         # frame, temp_rects = blue.get_contour(frame)
         # rects.append(temp_rects)
 
@@ -471,6 +551,8 @@ def main():
                 if event.key == pygame.K_SPACE:
                     bg_img = pygame.image.load(f"Images//BG_{random.randint(1, 4)}.jpg")
                     bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
+            elif event.type == pygame.USEREVENT:
+                choose_music(channel)
 
         # screen.fill((0, 0, 0))
         screen.blit(bg_img, (0, 0))
