@@ -5,11 +5,14 @@ import sys
 import math
 import random
 from menu import Button, Slider
+import time
 
 KERNEL_SIZE = 25
 
 WIDTH = 600
 HEIGHT = 500
+
+TARGET_RAD = 15
 
 # music from https://www.fesliyanstudios.com/royalty-free-music/downloads-c/japanese-music/63
 # credit to Fesliyan Studios
@@ -20,6 +23,16 @@ MUSIC_LIST = [
     "Music//Peaceful_Koi_Pond.mp3",
     "Music//Tokyo_Lo-Fi.mp3",
     "Music//Zen_Garden.mp3"
+]
+
+FRUIT_IMAGES = [
+    ("Images//Apple.png", (255, 0, 0)),
+    ("Images//Coconut.png", (255, 255, 255)),
+    ("Images//Lemon.png", (255, 255, 0)),
+    ("Images//Lime.png", (60, 255, 30)),
+    ("Images//Orange.png", (255, 180, 0)),
+    ("Images//Peach.png", (255, 114, 22)),
+    ("Images//Pomegranate.webp", (255, 80, 80))
 ]
 
 
@@ -127,7 +140,7 @@ class Colour:
 
 
 class Target:
-    def __init__(self, pos, rad, colour):
+    def __init__(self, pos, rad, colour, img):
         self.l_pos = list(pos)
         self.r_pos = list(pos)
         self.rad = rad
@@ -138,6 +151,7 @@ class Target:
         self.r_v = 0
         self.y_v = 0
         self.angle = 0
+        self.img = img
 
     # increments the position by given changes in x and y. -1 for side is left, 0 is both, 1 is right
     def incr_pos(self, side, d_x, d_y):
@@ -164,14 +178,14 @@ class Target:
         self.incr_pos(-1, self.l_v, self.y_v)
         self.incr_pos(1, self.r_v, self.y_v)
 
-    def draw(self, surface, src):
+    def draw(self, surface):
         if self.cut:
             bounds = pygame.Rect(self.l_pos[0] - self.rad, self.l_pos[1] - self.rad, self.rad, self.rad)
             pygame.draw.arc(surface, self.colour, bounds, self.angle, self.angle + math.pi, self.rad)
             bounds = pygame.Rect(self.r_pos[0] - self.rad, self.r_pos[1] - self.rad, self.rad, self.rad)
             pygame.draw.arc(surface, self.colour, bounds, self.angle + math.pi, self.angle, self.rad)
         else:
-            surface.blit(src, (self.l_pos[0] - self.rad, self.l_pos[1] - self.rad))
+            surface.blit(self.img, (self.l_pos[0] - self.rad, self.l_pos[1] - self.rad))
             # pygame.draw.circle(surface, self.colour, self.l_pos, self.rad)
 
 
@@ -207,6 +221,70 @@ class Ball:
 
     def draw(self, surface):
         pygame.draw.circle(surface, self.colour, (self.x, self.y), self.rad)
+
+
+def create_patterns(width, height, framerate):
+    patterns = []
+
+    # all patterns are lists of tuples that follow (x_pos, y_vel)
+
+    # from top left to bottom right
+    pat = []
+    top_v = (height * 4/5 + 0.25*framerate**2) / framerate
+    for i in range(5):
+        pat.append(((width * (i+1)) // 6, top_v - i))
+    patterns.append(pat)
+
+    # from bottom left to top right
+    pat = []
+    top_v = (height * 4/5 + 0.25*framerate**2) / framerate
+    for i in range(5):
+        pat.append(((width * (i + 1)) // 6, top_v - 4 + i))
+    patterns.append(pat)
+
+    # row at top
+    pat = []
+    top_v = (height * 4/5 + 0.25*framerate**2) / framerate
+    for i in range(5):
+        pat.append(((width * (i + 1)) // 6, top_v))
+    patterns.append(pat)
+
+    # row at middle
+    pat = []
+    top_v = (height // 2 + 0.25*framerate**2) / framerate
+    for i in range(5):
+        pat.append(((width * (i + 1)) // 6, top_v))
+    patterns.append(pat)
+
+    # column at left
+    pat = []
+    top_v = (height * 4/5 + 0.25*framerate**2) / framerate
+    for i in range(5):
+        pat.append((width // 6, top_v - i))
+    patterns.append(pat)
+
+    # column at right
+    pat = []
+    top_v = (height * 4/5 + 0.25*framerate**2) / framerate
+    for i in range(5):
+        pat.append(((width * 5) // 6, top_v - i))
+    patterns.append(pat)
+
+    # column at middle
+    pat = []
+    top_v = (height * 4/5 + 0.25*framerate**2) / framerate
+    for i in range(5):
+        pat.append((width // 2, top_v - i))
+    patterns.append(pat)
+
+    # random
+    pat = []
+    half_v = (height * 4/5 + 0.25*framerate**2) / (framerate * 2)
+    for i in range(5):
+        pat.append((random.randint(width // 6, (width * 5) // 6), random.random() * half_v + math.sqrt(2)*half_v))
+    patterns.append(pat)
+
+    return patterns
 
 
 def choose_music(channel):
@@ -322,7 +400,7 @@ def merge_rects(rect_list):
     return copy_list
 
 
-def settings_screen(surface, sound_channel):
+def game_over(surface, sound_channel, score, high_score):
 
     win_width = surface.get_width()
     win_height = surface.get_height()
@@ -337,17 +415,44 @@ def settings_screen(surface, sound_channel):
 
     init_volume = int(get_setting("volume"))
 
-    back_button = Button(
+    title_button = Button(
         win_width // 2 - 200,
         win_height // 2 + 240,
         400,
         100,
-        "Back",
+        "Quit",
+        font_path="Midorima.ttf",
+        font_size=72
+    )
+    play_button = Button(
+        win_width // 2 - 200,
+        win_height // 2 + 120,
+        400,
+        100,
+        "Play Again",
         font_path="Midorima.ttf",
         font_size=72
     )
 
-    my_slider = Slider("Volume", init_volume, win_width // 2 - 300, win_height // 2, 600 , 40, font_size=36)
+    score_text = Button(
+        win_width // 4 - 200,
+        win_height // 4 + 120,
+        400,
+        100,
+        "Score: " + str(score),
+        font_size=72
+    )
+    high_text = Button(
+        win_width * 3 // 4 - 200,
+        win_height // 4 + 120,
+        400,
+        100,
+        "High Score: " + str(high_score),
+        font_size=72
+    )
+
+    if score > high_score:
+        high_text.text = "New High Score: " + str(score)
 
     while True:
         events = pygame.event.get()
@@ -368,21 +473,21 @@ def settings_screen(surface, sound_channel):
 
         surface.blit(bg_img, (0, 0))
 
-        back_button.update(mouse_down)
-        back_button.draw(surface, (255, 255, 255), (255, 255, 255), 10, 3)
+        title_button.update(mouse_down)
+        title_button.draw(surface, (255, 255, 255), (255, 255, 255), 10, 3)
+        play_button.update(mouse_down)
+        play_button.draw(surface, (255, 255, 255), (255, 255, 255), 10, 3)
 
-        my_slider.update(mouse_down)
-        my_slider.draw(surface, (255, 255, 255))
+        score_text.draw(surface, (255, 255, 255), (255, 255, 255), border_w=-1)
+        high_text.draw(surface, (255, 255, 255), (255, 255, 255), border_w=-1)
 
-        if back_button.pressed:
-            break
+        if title_button.pressed:
+            return False
+        if play_button.pressed:
+            return True
 
         # sets the volume. Value must be from 0.0-1.0 and self.value is from 0-100
-        sound_channel.set_volume(my_slider.value / 100)
-
-        if my_slider.value != init_volume:
-            change_setting("volume", my_slider.value)
-            init_volume = my_slider.value
+        sound_channel.set_volume(init_volume / 100)
 
         pygame.display.flip()
 
@@ -632,8 +737,9 @@ def main():
     pygame.font.init()
     pygame.mixer.init()
 
-    font = pygame.font.Font(None, 48)
+    font = pygame.font.Font(None, 72)
     score = 0
+    high_score = int(get_setting("high_score"))
 
     res_info = pygame.display.Info()
     win_width = res_info.current_w
@@ -641,6 +747,8 @@ def main():
 
     window = pygame.display.set_mode((win_width, win_height))
     screen = pygame.Surface((WIDTH, HEIGHT))
+
+    pygame.display.set_caption("Slice Master")
 
     clock = pygame.time.Clock()
 
@@ -658,9 +766,6 @@ def main():
     channel.set_endevent(pygame.USEREVENT)
 
     targets = []
-    for i in range(10):
-        target_1 = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
-        targets.append(target_1)
     particles = []
 
     trail = []
@@ -684,12 +789,22 @@ def main():
     # creates an object that holds default device camera values
     camera = cv2.VideoCapture(0)
 
-    bg_img = pygame.image.load(f"Images//BG_{random.randint(1, 4)}.jpg")
+    bg_img = pygame.image.load("Images//BG_4.jpg")
     bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
     fruit_img = pygame.image.load("Images//Pomegranate.webp")
     fruit_img = pygame.transform.scale(fruit_img, (30, 30))
 
+    # image Designed by Freepik
+    win_bg_img = pygame.image.load("Images//Title_bg.jpg")
+    win_bg_img = pygame.transform.scale(win_bg_img, (win_width, win_height))
+
+    start_time = time.time()
+
     framerate = camera.get(cv2.CAP_PROP_FPS)
+    framecount = 0
+    next_target_frame = framerate * random.randint(1, 3)
+
+    patterns = create_patterns(WIDTH, HEIGHT, framerate)
 
     while True:
 
@@ -704,33 +819,22 @@ def main():
         hsv_data = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
         # Set up lower and upper bounds for each desired colour
-        red = Colour(0, 10, "red", hsv_data, minimum_s=160, maximum_v=220)
-        red_result = red.dilate_colour(KERNEL_SIZE, frame)
-
-        # minimum_v=100, minimum_s=120
-        green = Colour(175, 0, "pink", hsv_data, minimum_v=100, minimum_s=120)  # min_v=30
-        green_result = green.dilate_colour(KERNEL_SIZE, frame)
-
         yellow = Colour(30, sens, "yellow", hsv_data, minimum_v=min_v, maximum_v=max_v, minimum_s=min_s, maximum_s=max_s)  # min_v=130
         yellow.dilate_colour(KERNEL_SIZE, frame)
 
-        blue = Colour(120, 20, "blue", hsv_data)
-        blue_result = blue.dilate_colour(KERNEL_SIZE, frame)
-
         # finds the location of all patches of the given colours. Stores in a list of rectangles
-        # frame, temp_rects = red.get_contour(frame)
-        # rects.append(temp_rects)
-        # frame, temp_rects = green.get_contour(frame)
-        # rects.append(temp_rects)
         frame, temp_rects = yellow.get_contour(frame)
         rects.append(temp_rects)
-        # frame, temp_rects = blue.get_contour(frame)
-        # rects.append(temp_rects)
 
-        cv2.imshow("Colour Detection Viewer", frame)
+        frame_rgb = frame.transpose([1, 0, 2])
+        frame_rgb = cv2.cvtColor(frame_rgb, cv2.COLOR_BGR2RGB)
+        colour_viewer = pygame.surfarray.make_surface(frame_rgb)
+
+        # cv2.imshow("Colour Detection Viewer", frame)
         # End of CV2 Process--------------------------------------------------------------------------------------------
 
         # Start of Pygame Process---------------------------------------------------------------------------------------
+        framecount += 1
         clock.tick(framerate)
 
         for event in pygame.event.get():
@@ -763,7 +867,7 @@ def main():
 
         for target in targets:
             target.update()
-            target.draw(screen, fruit_img)
+            target.draw(screen)
 
         for piece in particles:
             piece.update()
@@ -774,7 +878,6 @@ def main():
             avg = list(avg_ball[i].pos)
             for ball in balls[i]:
                 avg[0] += (ball.x - avg[0]) * math.sqrt(ball.rad) / 16
-                # avg[0] += (math.sqrt(math.fabs(ball.x - avg[0])) * ball.rad / 16) * (ball.x - avg[0]) / math.fabs(ball.x - avg[0])
                 avg[1] += (ball.y - avg[1]) * math.sqrt(ball.rad) / 16
                 ball.update()
                 # ball.draw(screen)
@@ -794,7 +897,7 @@ def main():
 
             for target in targets:
                 if not target.cut:
-                    if math.sqrt((avg_ball[i].pos[0] - target.l_pos[0])**2 + (avg_ball[i].pos[1] - target.l_pos[1])**2) < avg_ball[i].rad + target_1.rad:
+                    if math.sqrt((avg_ball[i].pos[0] - target.l_pos[0])**2 + (avg_ball[i].pos[1] - target.l_pos[1])**2) < avg_ball[i].rad + TARGET_RAD:
                         if ball_v[0] == 0:
                             angle = math.pi / 2
                         else:
@@ -802,7 +905,7 @@ def main():
                         target.activate_cut(angle)
                         score += 1
                         for j in range(300):
-                            particles.append(Particle(target.l_pos, random.random() * 5, 3, (255, 0, 0)))
+                            particles.append(Particle(target.l_pos, random.random() * 5, 3, target.colour))
                         # target = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
 
         # pygame.draw.line(screen, (255, 255, 255), tuple(connections[0]), tuple(connections[1]), 8)
@@ -824,25 +927,72 @@ def main():
             if particles[i].pos.y > HEIGHT:
                 particles.pop(i)
 
-        for i in range(len(targets)):
+        for i in range(len(targets) - 1, -1, -1):
             if targets[i].l_pos[1] > HEIGHT and targets[i].r_pos[1] > HEIGHT:
-                target = Target((random.randint(30, WIDTH-30), HEIGHT), 20, (255, 0, 0))
-                target.y_v = -20
-                rand_num = random.random()*4
+                targets.pop(i)
+
+        if framecount >= next_target_frame:
+            pattern = patterns[random.randint(0, len(patterns) - 1)]
+            src, colour = FRUIT_IMAGES[random.randint(0, len(FRUIT_IMAGES) - 1)]
+            img = pygame.image.load(src)
+            img = pygame.transform.scale(img, (TARGET_RAD*2, TARGET_RAD*2))
+            for line in pattern:
+                target = Target((line[0], HEIGHT + 4), TARGET_RAD, colour, img)
+                target.y_v = -line[1]
+                rand_num = random.random()*2 - 1
                 target.l_v = rand_num
                 target.r_v = rand_num
-                targets[i] = target
+                targets.append(target)
+            next_target_frame = framecount + framerate * random.randint(1, 2)
 
-        text = font.render(str(score), True, (255, 255, 255))
-        screen.blit(text, (WIDTH//2-10, HEIGHT//20))
+        # for i in range(len(targets)):
+        #     if targets[i].l_pos[1] > HEIGHT and targets[i].r_pos[1] > HEIGHT:
+        #         target = Target((random.randint(30, WIDTH-30), HEIGHT), 20, (255, 0, 0))
+        #         target.y_v = -20
+        #         rand_num = random.random()*4
+        #         target.l_v = rand_num
+        #         target.r_v = rand_num
+        #         targets[i] = target
+
+        elapsed_time = int(start_time - time.time() + 60)
+        if elapsed_time <= 0:
+            if score > high_score:
+                change_setting("high_score", score)
+            play_again = game_over(window, channel, score, high_score)
+            if play_again:
+                score = 0
+                high_score = int(get_setting("high_score"))
+                start_time = time.time()
+                framecount = 0
+                next_target_frame = 3*framerate
+                targets = []
+            else:
+                break
+
+        window.blit(win_bg_img, (0, 0))
 
         new_w = WIDTH * (win_height / HEIGHT)
         screen_surface = pygame.transform.scale(screen, (new_w, win_height))
-        window.blit(screen_surface, (win_width//2 - new_w//2, 0))
+        window.blit(screen_surface, (win_width - new_w, 0))
+
+        new_h = (win_width - new_w) * colour_viewer.get_height() / colour_viewer.get_width()
+        colour_viewer = pygame.transform.scale(colour_viewer, (win_width - new_w, new_h))
+        window.blit(colour_viewer, (0, 0))
+
+        text = font.render("Score: " + str(score), True, (255, 255, 255))
+        window.blit(text, ((win_width - new_w) // 10, new_h + win_height // 20))
+
+        text = font.render("Time: " + str(elapsed_time), True, (255, 255, 255))
+        window.blit(text, ((win_width - new_w) // 10, new_h + win_height // 20 + 60))
+
+        text = font.render("High Score: " + str(high_score), True, (255, 255, 255))
+        window.blit(text, ((win_width - new_w) // 10, new_h + win_height // 20 + 180))
 
         pygame.display.flip()
 
         # End of Pygame Process-----------------------------------------------------------------------------------------
+
+    # End of main loop - Begin end process------------------------------------------------------------------------------
 
 
 if __name__ == "__main__":
