@@ -1,1 +1,7 @@
-volume: 100
+volume: 86
+hue: 30
+sens: 8
+min_v: 133
+max_v: 255
+min_s: 197
+max_s: 255

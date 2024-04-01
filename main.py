@@ -5,9 +5,8 @@ import sys
 import math
 import random
 from menu import Button, Slider
-import time
 
-KERNEL_SIZE = 20
+KERNEL_SIZE = 25
 
 WIDTH = 600
 HEIGHT = 500
@@ -204,7 +203,7 @@ class Ball:
         self.colour = colour
 
     def update(self):
-        self.rad -= 0.1
+        self.rad -= 0.5
 
     def draw(self, surface):
         pygame.draw.circle(surface, self.colour, (self.x, self.y), self.rad)
@@ -214,6 +213,33 @@ def choose_music(channel):
     rand_track = random.randint(0, len(MUSIC_LIST) - 1)
     track = pygame.mixer.Sound(MUSIC_LIST[rand_track])
     channel.play(track)
+
+
+def divide_line(x1, y1, x2, y2, n):
+    d_x = x2 - x1
+    d_y = y2 - y1
+    points = []
+
+    if d_x == 0 and d_y == 0:
+        return [(x1, y1)]
+    elif d_x == 0:
+        y = min(y1, y2)
+        while y < max(y1, y2):
+            points.append([x1, y])
+            y += math.fabs(d_y / n)
+        points.append((x1, max(y1, y2)))
+        return points
+
+    m = d_y / d_x
+    b = y1 - m * x1
+
+    x = min(x1, x2)
+    while x < max(x1, x2):
+        points.append([x, m * x + b])
+        x += math.fabs(d_x / n)
+    points.append((max(x1, x2), m * max(x1, x2) + b))
+
+    return points
 
 
 def get_setting(label):
@@ -229,6 +255,27 @@ def get_setting(label):
         except:
             print("error reading file")
             return None
+
+
+def change_setting(label, value):
+    data = []
+    with open("settings.txt", 'r') as f:
+        try:
+            data = f.readlines()
+        except:
+            print("error reading file")
+
+    with open("settings.txt", 'w') as f:
+        try:
+            for i in range(len(data)):
+                line_text = data[i].split()
+                line_text[0] = line_text[0].strip(':')
+                if line_text[0] == label:
+                    data[i] = label + ': ' + str(value) + '\n'
+                    break
+            f.writelines(data)
+        except:
+            print("error reading file")
 
 
 # combines colliding rects in the list
@@ -334,10 +381,150 @@ def settings_screen(surface, sound_channel):
         sound_channel.set_volume(my_slider.value / 100)
 
         if my_slider.value != init_volume:
-            with open("settings.txt", 'w') as f:
-                f.write(f"volume: {my_slider.value}")
-
+            change_setting("volume", my_slider.value)
             init_volume = my_slider.value
+
+        pygame.display.flip()
+
+        clock.tick(165)
+
+
+def pause_menu(surface, sound_channel):
+
+    win_width = surface.get_width()
+    win_height = surface.get_height()
+
+    mouse_down = False
+
+    # image Designed by Freepik
+    bg_img = pygame.image.load("Images//Title_bg.jpg")
+    bg_img = pygame.transform.scale(bg_img, (win_width, win_height))
+
+    clock = pygame.time.Clock()
+
+    init_volume = int(get_setting("volume"))
+    sens = int(get_setting("sens"))
+    min_v = int(get_setting("min_v"))
+    max_v = int(get_setting("max_v"))
+    min_s = int(get_setting("min_s"))
+    max_s = int(get_setting("max_s"))
+
+    back_button = Button(
+        win_width // 2 - 200,
+        win_height // 2 + 240,
+        400,
+        100,
+        "Back",
+        font_path="Midorima.ttf",
+        font_size=72
+    )
+
+    v_slider = Slider("Volume", init_volume, win_width // 2 - 300, win_height // 3, 600, 40, font_size=36)
+    sens_slider = Slider("Sensitivity", sens, win_width // 2 - 300, win_height // 3 + 60, 600, 40, font_size=36, max_val=15)
+    min_v_slider = Slider("Minimum value", min_v, win_width // 2 - 300, win_height // 3 + 120, 600, 40, font_size=36, max_val=255)
+    max_v_slider = Slider("Maximum value", max_v, win_width // 2 - 300, win_height // 3 + 180, 600, 40, font_size=36, max_val=255)
+    min_s_slider = Slider("Minimum saturation", min_s, win_width // 2 - 300, win_height // 3 + 240, 600, 40, font_size=36, max_val=255)
+    max_s_slider = Slider("Maximum saturation", max_s, win_width // 2 - 300, win_height // 3 + 300, 600, 40, font_size=36, max_val=255)
+
+    camera = cv2.VideoCapture(0)
+
+    while True:
+        # CV2 Process---------------------------------------------------------------------------------------------------
+        rects = []
+
+        # grabs the frame data
+        frame = camera.read()[1]
+        frame = cv2.flip(frame, 1)
+
+        # convert rgb to hsv
+        hsv_data = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        # Set up lower and upper bounds for each desired colour
+
+        yellow = Colour(30, sens, "yellow", hsv_data, minimum_v=min_v, maximum_v=max_v, minimum_s=min_s, maximum_s=max_s)  # min_v=130
+        yellow.dilate_colour(KERNEL_SIZE, frame)
+
+        frame, temp_rects = yellow.get_contour(frame)
+        rects.append(temp_rects)
+
+        frame_rgb = frame.transpose([1, 0, 2])
+        frame_rgb = cv2.cvtColor(frame_rgb, cv2.COLOR_BGR2RGB)
+        colour_viewer = pygame.surfarray.make_surface(frame_rgb)
+
+        # cv2.imshow("Colour Detection Viewer", frame)
+        # End of CV2 Process--------------------------------------------------------------------------------------------
+
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_down = True
+            elif event.type == pygame.MOUSEBUTTONUP:
+                mouse_down = False
+            elif event.type == pygame.USEREVENT:
+                choose_music(sound_channel)
+
+        surface.blit(bg_img, (0, 0))
+
+        back_button.update(mouse_down)
+        back_button.draw(surface, (255, 255, 255), (255, 255, 255), 10, 3)
+
+        # update and draw all sliders. These should really be in a list
+        v_slider.update(mouse_down)
+        v_slider.draw(surface, (255, 255, 255))
+        sens_slider.update(mouse_down)
+        sens_slider.draw(surface, (255, 255, 255))
+        min_v_slider.update(mouse_down)
+        min_v_slider.draw(surface, (255, 255, 255))
+        max_v_slider.update(mouse_down)
+        max_v_slider.draw(surface, (255, 255, 255))
+        min_s_slider.update(mouse_down)
+        min_s_slider.draw(surface, (255, 255, 255))
+        max_s_slider.update(mouse_down)
+        max_s_slider.draw(surface, (255, 255, 255))
+
+        if back_button.pressed:
+            break
+
+        # sets the volume. Value must be from 0.0-1.0 and self.value is from 0-100
+        sound_channel.set_volume(v_slider.value / 100)
+        if v_slider.value != init_volume:
+            change_setting("volume", v_slider.value)
+            init_volume = v_slider.value
+
+        # sets the sensitivity. Value should be from 0-15 and self.value is from 0-15
+        if sens_slider.value != sens:
+            change_setting("sens", sens_slider.value)
+            sens = sens_slider.value
+
+        # sets the minimum value to detect. Value must be from 0-255 and self.value is from 0-255
+        if min_v_slider.value != min_v:
+            change_setting("min_v", min_v_slider.value)
+            min_v = min_v_slider.value
+
+        # sets the maximum value to detect. Value must be from 0-255 and self.value is from 0-255
+        if max_v_slider.value != max_v:
+            change_setting("max_v", max_v_slider.value)
+            max_v = max_v_slider.value
+
+        # sets the minimum value to detect. Value must be from 0-255 and self.value is from 0-255
+        if min_s_slider.value != min_s:
+            change_setting("min_s", min_s_slider.value)
+            min_s = min_s_slider.value
+
+        # sets the minimum value to detect. Value must be from 0-255 and self.value is from 0-255
+        if max_s_slider.value != max_s:
+            change_setting("max_s", max_s_slider.value)
+            max_s = max_s_slider.value
+
+        colour_viewer = pygame.transform.scale(colour_viewer, (win_width//2 - 350, (win_width//2 - 350) * colour_viewer.get_height() / colour_viewer.get_width()))
+        surface.blit(colour_viewer, (0, 0))
 
         pygame.display.flip()
 
@@ -404,6 +591,7 @@ def title_screen(surface, sound_channel):
                 mouse_down = False
             elif event.type == pygame.USEREVENT:
                 choose_music(sound_channel)
+                sound_channel.set_volume(init_volume)
 
         # screen.fill((0, 0, 0))
         surface.blit(bg_img, (0, 0))
@@ -425,7 +613,7 @@ def title_screen(surface, sound_channel):
 
         if settings_button.pressed:
             mouse_down = False
-            settings_screen(surface, sound_channel)
+            pause_menu(surface, sound_channel)
             init_volume = int(get_setting("volume"))
 
         if quit_button.pressed:
@@ -475,7 +663,16 @@ def main():
         targets.append(target_1)
     particles = []
 
+    trail = []
+
     title_screen(window, channel)
+
+    init_volume = int(get_setting("volume"))
+    sens = int(get_setting("sens"))
+    min_v = int(get_setting("min_v"))
+    max_v = int(get_setting("max_v"))
+    min_s = int(get_setting("min_s"))
+    max_s = int(get_setting("max_s"))
 
     # Run loading screen before attempting to load camera
     screen.fill((0, 0, 0))
@@ -514,8 +711,8 @@ def main():
         green = Colour(175, 0, "pink", hsv_data, minimum_v=100, minimum_s=120)  # min_v=30
         green_result = green.dilate_colour(KERNEL_SIZE, frame)
 
-        yellow = Colour(30, 10, "yellow", hsv_data, minimum_v=70)  # min_v=130
-        yellow_result = yellow.dilate_colour(KERNEL_SIZE, frame)
+        yellow = Colour(30, sens, "yellow", hsv_data, minimum_v=min_v, maximum_v=max_v, minimum_s=min_s, maximum_s=max_s)  # min_v=130
+        yellow.dilate_colour(KERNEL_SIZE, frame)
 
         blue = Colour(120, 20, "blue", hsv_data)
         blue_result = blue.dilate_colour(KERNEL_SIZE, frame)
@@ -523,10 +720,10 @@ def main():
         # finds the location of all patches of the given colours. Stores in a list of rectangles
         # frame, temp_rects = red.get_contour(frame)
         # rects.append(temp_rects)
-        frame, temp_rects = green.get_contour(frame)
-        rects.append(temp_rects)
-        # frame, temp_rects = yellow.get_contour(frame)
+        # frame, temp_rects = green.get_contour(frame)
         # rects.append(temp_rects)
+        frame, temp_rects = yellow.get_contour(frame)
+        rects.append(temp_rects)
         # frame, temp_rects = blue.get_contour(frame)
         # rects.append(temp_rects)
 
@@ -553,6 +750,7 @@ def main():
                     bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
             elif event.type == pygame.USEREVENT:
                 choose_music(channel)
+                channel.set_volume(init_volume / 100)
 
         # screen.fill((0, 0, 0))
         screen.blit(bg_img, (0, 0))
@@ -575,8 +773,9 @@ def main():
         for i in range(len(balls)):
             avg = list(avg_ball[i].pos)
             for ball in balls[i]:
-                avg[0] += (ball.x - avg[0]) * ball.rad / 16
-                avg[1] += (ball.y - avg[1]) * ball.rad / 16
+                avg[0] += (ball.x - avg[0]) * math.sqrt(ball.rad) / 16
+                # avg[0] += (math.sqrt(math.fabs(ball.x - avg[0])) * ball.rad / 16) * (ball.x - avg[0]) / math.fabs(ball.x - avg[0])
+                avg[1] += (ball.y - avg[1]) * math.sqrt(ball.rad) / 16
                 ball.update()
                 # ball.draw(screen)
             avg_ball[i] = Ball(avg, 8, (0, 0, 255))
@@ -585,6 +784,13 @@ def main():
 
         for i in range(len(avg_ball)):
             ball_v = (avg_ball[i].pos[0] - old_pos[i][0]), (avg_ball[i].pos[1] - old_pos[i][1])
+            ball_speed = math.sqrt(ball_v[0]**2 + ball_v[1]**2)
+            points = divide_line(old_pos[i][0], old_pos[i][1], avg_ball[i].pos[0], avg_ball[i].pos[1], ball_speed)
+
+            for point in points:
+                trail.append(Ball(point, 8, (255, 240, 0)))
+
+            old_pos[i] = avg_ball[i].pos
 
             for target in targets:
                 if not target.cut:
@@ -600,6 +806,14 @@ def main():
                         # target = Target((random.randint(0, WIDTH), random.randint(0, HEIGHT)), 20, (255, 0, 0))
 
         # pygame.draw.line(screen, (255, 255, 255), tuple(connections[0]), tuple(connections[1]), 8)
+
+        for ball in trail:
+            ball.update()
+            ball.draw(screen)
+
+        for i in range(len(trail) - 1, -1, -1):
+            if trail[i].rad <= 0:
+                trail.pop(i)
 
         for ball_type in balls:
             for i in range(len(ball_type) - 1, -1, -1):

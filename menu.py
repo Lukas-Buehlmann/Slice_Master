@@ -74,14 +74,15 @@ class Button:
 
 
 class Slider:
-    def __init__(self, label, init_value, x, y, w, h, font_path=None, font_size=12):
+    def __init__(self, label, init_value, x, y, w, h, font_path=None, font_size=12, max_val=100):
         self.label = label
         self.font = pygame.font.Font(font_path, font_size)
         self.value = init_value
         self.rect = pygame.Rect(x, y, w, h)
+        self.max_val = max_val
 
         self.text_w, self.text_h = self.font.size(self.label)  # size of label
-        self.num_w, self.num_h = self.font.size("100")  # width of value number at max width (at 100)
+        self.num_w, self.num_h = self.font.size(str(max_val))  # width of value number at max width
         self.offset = w // 20
 
         self.slider_range = (self.rect.x + self.text_w + self.offset, self.rect.right - self.offset - self.num_w)
@@ -93,8 +94,8 @@ class Slider:
             raw_x = clamp(mouse_x, self.slider_range[0], self.slider_range[1])
             raw_x -= self.slider_range[0]  # brings values of x from 0 to slider max
 
-            # map between 0 and 100
-            self.value = round((100 * raw_x) / (self.slider_range[1] - self.slider_range[0]))
+            # map between 0 and max_val
+            self.value = round((self.max_val * raw_x) / (self.slider_range[1] - self.slider_range[0]))
 
     def draw(self, surface, colour):
 
@@ -115,7 +116,7 @@ class Slider:
 
         # draw tick mark
         vert_bar = pygame.Rect(
-            round(self.value * slider_w / 100 - slider_w / 30) + self.slider_range[0],
+            round(self.value * slider_w / self.max_val - slider_w / 30) + self.slider_range[0],
             self.rect.top,
             slider_w // 15,
             self.rect.h
