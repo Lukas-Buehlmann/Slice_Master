@@ -1,8 +1,8 @@
-volume: 86
+volume: 100
 hue: 30
 sens: 8
 min_v: 160
 max_v: 255
 min_s: 153
-max_s: 255
+max_s: 243
 high_score: 124

@@ -13,6 +13,7 @@ WIDTH = 600
 HEIGHT = 500
 
 TARGET_RAD = 15
+TIME_LIMIT = 60
 
 # music from https://www.fesliyanstudios.com/royalty-free-music/downloads-c/japanese-music/63
 # credit to Fesliyan Studios
@@ -223,6 +224,7 @@ class Ball:
         pygame.draw.circle(surface, self.colour, (self.x, self.y), self.rad)
 
 
+# creates patterns for targets to travel through
 def create_patterns(width, height, framerate):
     patterns = []
 
@@ -293,6 +295,7 @@ def choose_music(channel):
     channel.play(track)
 
 
+# divides a line segment into n points from beginning to end pos
 def divide_line(x1, y1, x2, y2, n):
     d_x = x2 - x1
     d_y = y2 - y1
@@ -954,7 +957,7 @@ def main():
         #         target.r_v = rand_num
         #         targets[i] = target
 
-        elapsed_time = int(start_time - time.time() + 60)
+        elapsed_time = int(start_time - time.time() + TIME_LIMIT)
         if elapsed_time <= 0:
             if score > high_score:
                 change_setting("high_score", score)
